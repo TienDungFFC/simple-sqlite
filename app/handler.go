@@ -101,8 +101,7 @@ func (db *Database) ReadDb() {
 		for _, cellPointer := range cellPointerArray {
 			reader.Seek(int64(cellPointer), io.SeekStart)
 			_, _ = readVarint(reader)
-			rowId, n := readVarint(reader)
-			fmt.Printf("rowId: %d -- %d", rowId, n)
+			_, _ = readVarint(reader)
 			totalHeaderSize, offset := readVarint(reader)
 			colTypes := make([]uint64, 0)
 			for offset < int(totalHeaderSize) {
