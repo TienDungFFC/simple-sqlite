@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	// Available if you need it!
 	// "github.com/xwb1989/sqlparser"
@@ -19,6 +20,7 @@ func main() {
 	}()
 
 	db := NewDatabase(databaseFile)
+	fmt.Println("db created", db)
 	db.ReadDb()
 	db.HandleCommand(command)
 }
