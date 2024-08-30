@@ -25,6 +25,19 @@ type SchemaTable struct {
 	sql      string
 }
 
+type Payload struct {
+	// totalHeaderSize
+}
+
 func NewDatabase(dbFile *os.File) *Database {
 	return &Database{f: dbFile, SchemaTables: []*SchemaTable{}, Info: &DatabaseInfo{}}
+}
+
+func FindTable(tables []*SchemaTable, tblName string) *SchemaTable {
+	for _, t := range tables {
+		if t.tblName == tblName {
+			return t
+		}
+	}
+	return nil
 }

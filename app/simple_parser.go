@@ -3,6 +3,7 @@ package main
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 )
 
@@ -12,42 +13,87 @@ type Select struct {
 	Where      []string
 }
 
-func (s Select) isStatement() bool {
+func (s *Select) isStatement() bool {
 	return true
 }
 func SelectStatementParse(query string) (Statement, error) {
-	selectStmt := Select{}
-	qParts := strings.Split(strings.ToLower(query), " ")
-	if qParts[0] != "select" {
-		return nil, fmt.Errorf("This statement is not a select statement")
+	query = strings.TrimSpace(strings.ToLower(query))
+	if !strings.HasPrefix(query, "select ") {
+		return nil, fmt.Errorf("this statement is not a select statement")
 	}
 
-	exprs := make([]string, 0)
-	fromIdx := 0
-
-	for idx, ex := range qParts[1:] {
-		if ex == "from" {
-			fromIdx = idx
-			break
-		}
-		exprs = append(exprs, ex)
-	}
-	exprs = strings.Split(strings.Join(exprs, " "), ",")
-	for i, expr := range exprs {
-		exprs[i] = strings.TrimSpace(expr)
+	qParts := strings.Fields(query)
+	fromIdx := indexOf(qParts, "from")
+	if fromIdx == -1 {
+		return nil, fmt.Errorf("'from' keyword not found")
 	}
 
-	selectStmt.SelectExpr = exprs
-	fromIdx += 2
-	selectStmt.From = qParts[fromIdx]
+	exprs := qParts[1:fromIdx]
+	selectExpr := splitAndTrim(strings.Join(exprs, " "))
 
-	whereIdx := fromIdx + 2
-	if whereIdx < len(qParts) {
-		where := make([]string, 0)
-		where = append(where, qParts[whereIdx:]...)
-		selectStmt.Where = where
+	fromIdx++
+	if fromIdx >= len(qParts) {
+		return nil, fmt.Errorf("table name missing after 'from'")
+	}
+	table := qParts[fromIdx]
+
+	whereClause := []string{}
+	if fromIdx+1 < len(qParts) && qParts[fromIdx+1] == "where" {
+		whereClause = qParts[fromIdx+2:]
 	}
 
-	// only one table
+	selectStmt := &Select{
+		SelectExpr: selectExpr,
+		From:       table,
+		Where:      whereClause,
+	}
+
 	return selectStmt, nil
+}
+
+func CreateStatementParse(stmt string) []string {
+	re := regexp.MustCompile(`(?s)CREATE TABLE [^\(\)]+(?:\s*\((.*?)\))`)
+	match := re.FindStringSubmatch(stmt)
+
+	if len(match) > 1 {
+		fields := match[1]
+		fieldNames := extractFieldNames(fields)
+		fmt.Println(fieldNames)
+		return fieldNames
+	} else {
+		fmt.Println("No CREATE TABLE statement found.")
+	}
+	return nil
+}
+
+func extractFieldNames(fields string) []string {
+	var fieldNames []string
+
+	lines := strings.Split(fields, ",")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if index := strings.IndexAny(line, " \t"); index != -1 {
+			fieldName := line[:index]
+			fieldNames = append(fieldNames, fieldName)
+		}
+	}
+
+	return fieldNames
+}
+
+func indexOf(parts []string, keyword string) int {
+	for i, part := range parts {
+		if part == keyword {
+			return i
+		}
+	}
+	return -1
+}
+
+func splitAndTrim(expr string) []string {
+	exprs := strings.Split(expr, ",")
+	for i, ex := range exprs {
+		exprs[i] = strings.TrimSpace(ex)
+	}
+	return exprs
 }

@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"strings"
 )
 
 var (
@@ -162,31 +163,54 @@ type PageHeader struct {
 
 func (db *Database) HandleStatement() {
 	switch stmt := db.Statement.(type) {
-	case Select:
+	case *Select:
 		db.HandleSelectStatement(stmt)
 	}
 }
 
-func (db *Database) HandleSelectStatement(stmt Select) {
-	tables := db.SchemaTables
-	rootPage := -1
-	for _, table := range tables {
-		if table.tblName == stmt.From {
-			rootPage = table.rootPage
-			break
+func (db *Database) ReadPayload(reader *bytes.Reader) []any {
+	colData := make([]any, 0)
+	for _, col := range colTypes {
+
+		switch col {
+		case uint64(TYPE_INT8):
+			val, _ := reader.ReadByte()
+			colData = append(colData, int(val))
+		default:
+			if col >= 13 && col%2 != 0 {
+				size := (col - 13) / 2
+				content := make([]byte, size)
+				reader.Read(content)
+				colData = append(colData, content)
+			}
 		}
 	}
-	offset := (rootPage - 1) * int(db.Info.PageSize)
+}
+
+func (db *Database) HandleSelectStatement(stmt *Select) {
+	table := FindTable(db.SchemaTables, stmt.From)
+	colTables := CreateStatementParse(table.sql)
+	offset := (table.rootPage - 1) * int(db.Info.PageSize)
 	db.f.Seek(int64(offset), io.SeekStart)
 	pageContent := make([]byte, db.Info.PageSize)
 	_, err := db.f.Read(pageContent)
 	if err != nil {
 		fmt.Println("Read error: ", err)
 	}
+
+	var countTable bool
+	for _, expr := range stmt.SelectExpr {
+		if strings.Contains("COUNT(*)", expr) {
+			countTable = true
+			break
+		}
+	}
 	reader := bytes.NewReader(pageContent)
 	PageHeader, _ := readHeader(reader)
-	fmt.Println(PageHeader.numberOfCells)
-	if rootPage != -1 {
+	if countTable {
+		fmt.Println(PageHeader.numberOfCells)
+	} else {
 
 	}
+
 }

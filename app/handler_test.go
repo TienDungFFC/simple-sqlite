@@ -90,7 +90,17 @@ func TestHandleSelectStatement(t *testing.T) {
 	db := NewDatabase(databaseFile)
 	db.ReadDb()
 	stmt, _ := SelectStatementParse("SELECT COUNT(*) FROM apples")
-	s, _ := stmt.(Select)
+	s, _ := stmt.(*Select)
 	db.HandleSelectStatement(s)
 	t.Errorf("!@3")
+}
+
+func TestCreateParse(t *testing.T) {
+	sql := `CREATE TABLE apples
+(
+	id integer primary key autoincrement,
+	name text,
+	color text
+)`
+	CreateStatementParse(sql)
 }
