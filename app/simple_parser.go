@@ -58,7 +58,6 @@ func CreateStatementParse(stmt string) []string {
 	if len(match) > 1 {
 		fields := match[1]
 		fieldNames := extractFieldNames(fields)
-		fmt.Println(fieldNames)
 		return fieldNames
 	} else {
 		fmt.Println("No CREATE TABLE statement found.")
