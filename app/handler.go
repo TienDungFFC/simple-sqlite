@@ -261,6 +261,13 @@ func (db *Database) HandleSelectStatement(stmt *Select) {
 							})
 						}
 					}
+				} else {
+					filterCell = append(filterCell, Cell{
+						LeftChildPage: 0,
+						Value:         "",
+						RowId:         1,
+						Payload:       data,
+					})
 				}
 			}
 
