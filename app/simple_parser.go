@@ -39,7 +39,7 @@ func SelectStatementParse(query string) (Statement, error) {
 
 	whereClause := []string{}
 	if fromIdx+1 < len(qParts) && qParts[fromIdx+1] == "where" {
-		whereClause = qParts[fromIdx+2:]
+		whereClause = removeQuotesFromWhereClause(qParts[fromIdx+2:])
 	}
 
 	selectStmt := &Select{
@@ -49,6 +49,15 @@ func SelectStatementParse(query string) (Statement, error) {
 	}
 
 	return selectStmt, nil
+}
+
+func removeQuotesFromWhereClause(whereClause []string) []string {
+	var cleanedClause []string
+	for _, condition := range whereClause {
+		cleanedCondition := strings.ReplaceAll(condition, "'", "")
+		cleanedClause = append(cleanedClause, cleanedCondition)
+	}
+	return cleanedClause
 }
 
 func CreateStatementParse(stmt string) []string {

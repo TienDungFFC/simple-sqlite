@@ -251,7 +251,10 @@ func (db *Database) HandleSelectStatement(stmt *Select) {
 					col := stmt.Where[0]
 					val := stmt.Where[2]
 					if idx, ok := records[col]; ok {
-						if data[idx] == val {
+						r := data[idx]
+						fmt.Println("val: ", val)
+						fmt.Println("r: ", fmt.Sprintf("%s", r))
+						if strings.EqualFold(strings.ToLower(fmt.Sprintf("%s", r)), strings.ToLower(val)) {
 							filterCell = append(filterCell, Cell{
 								LeftChildPage: 0,
 								Value:         "",
@@ -268,10 +271,8 @@ func (db *Database) HandleSelectStatement(stmt *Select) {
 		for _, expr := range stmt.SelectExpr {
 			if idx, ok := records[expr]; ok {
 				for i, cell := range filterCell {
-					switch t := cell.Payload[idx].(type) {
-					case string:
-						results[i] = append(results[i], t)
-					}
+					t := cell.Payload[idx]
+					results[i] = append(results[i], fmt.Sprintf("%s", t))
 				}
 			}
 		}

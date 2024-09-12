@@ -95,6 +95,21 @@ func TestHandleSelectStatement(t *testing.T) {
 	t.Errorf("!@3")
 }
 
+func TestHandleSelectStatementWithCondition(t *testing.T) {
+	databaseFile, err := os.Open("../sample.db")
+	if err != nil {
+		panic(err)
+	}
+	defer databaseFile.Close()
+
+	db := NewDatabase(databaseFile)
+	db.ReadDb()
+	stmt, _ := SelectStatementParse("SELECT name, color FROM apples WHERE color = 'Yellow'")
+	s, _ := stmt.(*Select)
+	db.HandleSelectStatement(s)
+	t.Errorf("!@3")
+}
+
 func TestCreateParse(t *testing.T) {
 	sql := `CREATE TABLE apples
 (
