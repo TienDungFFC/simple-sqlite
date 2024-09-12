@@ -214,6 +214,10 @@ func (db *Database) HandleSelectStatement(stmt *Select) {
 	}
 	reader := bytes.NewReader(pageContent)
 	PageHeader, _ := readHeader(reader)
+	records := make(map[string]int, 0)
+	for i, col := range colTables {
+		records[col] = i
+	}
 	if countTable {
 		fmt.Println(PageHeader.numberOfCells)
 	} else {
@@ -227,6 +231,7 @@ func (db *Database) HandleSelectStatement(stmt *Select) {
 			binary.Read(reader, binary.BigEndian, &cellPointer)
 			cellPointerArray = append(cellPointerArray, cellPointer)
 		}
+		filterCell := make([]Cell, 0)
 		for _, cellPointer := range cellPointerArray {
 			reader.Seek(int64(cellPointer), io.SeekStart)
 			_, _ = readVarint(reader)
@@ -239,28 +244,40 @@ func (db *Database) HandleSelectStatement(stmt *Select) {
 				offset += m
 			}
 			data := db.ReadPayload(reader, colTypes)
-			recordData := make(map[string]string, 0)
+
 			if len(data) > 0 {
-
-				for i, col := range colTables {
-					recordData[col] = fmt.Sprintf("%s", data[i])
-				}
-
-				for i, expr := range stmt.SelectExpr {
-					if record, ok := recordData[expr]; ok {
-						if i == len(stmt.SelectExpr)-1 {
-							fmt.Println(record)
-						} else {
-							fmt.Print(record)
+				// only applies to 1 condition comparision
+				if len(stmt.Where) > 0 {
+					col := stmt.Where[0]
+					val := stmt.Where[2]
+					if idx, ok := records[col]; ok {
+						if data[idx] == val {
+							filterCell = append(filterCell, Cell{
+								LeftChildPage: 0,
+								Value:         "",
+								RowId:         1,
+								Payload:       data,
+							})
 						}
 					}
-					if i < len(stmt.SelectExpr)-1 {
-						fmt.Print("|")
-					}
 				}
-
 			}
 
+		}
+		results := make([][]string, len(filterCell))
+		for _, expr := range stmt.SelectExpr {
+			if idx, ok := records[expr]; ok {
+				for i, cell := range filterCell {
+					switch t := cell.Payload[idx].(type) {
+					case string:
+						results[i] = append(results[i], t)
+					}
+				}
+			}
+		}
+
+		for _, res := range results {
+			fmt.Println(strings.Join(res, "|"))
 		}
 	}
 
