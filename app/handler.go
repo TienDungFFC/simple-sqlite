@@ -252,8 +252,6 @@ func (db *Database) HandleSelectStatement(stmt *Select) {
 					val := stmt.Where[2]
 					if idx, ok := records[col]; ok {
 						r := data[idx]
-						fmt.Println("val: ", val)
-						fmt.Println("r: ", fmt.Sprintf("%s", r))
 						if strings.EqualFold(strings.ToLower(fmt.Sprintf("%s", r)), strings.ToLower(val)) {
 							filterCell = append(filterCell, Cell{
 								LeftChildPage: 0,
