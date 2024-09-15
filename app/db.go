@@ -25,6 +25,13 @@ type SchemaTable struct {
 	sql      string
 }
 
+type Cell struct {
+	LeftChildPage int64  // actually only 4 byte but to be consistent
+	Value         string // i assume
+	RowId         int64  // varint, The keys in an interior page represent the upper bounds for the ranges of keys in the child pages.
+	Payload       []any  // for the table leaf cell
+}
+
 type Payload struct {
 	// totalHeaderSize
 }

@@ -16,8 +16,9 @@ var (
 )
 
 var (
-	TYPE_NULL = 0
-	TYPE_INT8 = 1
+	TYPE_NULL  = 0
+	TYPE_INT8  = 1
+	TYPE_INT32 = 4
 )
 
 func (db *Database) HandleCommand(command string) {
@@ -168,14 +169,19 @@ func (db *Database) HandleStatement() {
 	}
 }
 
-func (db *Database) ReadPayload(reader *bytes.Reader) []any {
+func (db *Database) ReadPayload(reader *bytes.Reader, colTypes []uint64) []any {
 	colData := make([]any, 0)
 	for _, col := range colTypes {
-
 		switch col {
+		case uint64(TYPE_NULL):
+			colData = append(colData, nil)
 		case uint64(TYPE_INT8):
 			val, _ := reader.ReadByte()
 			colData = append(colData, int(val))
+		case uint64(TYPE_INT32):
+			var val32 int
+			binary.Read(reader, binary.BigEndian, &val32)
+			colData = append(colData, val32)
 		default:
 			if col >= 13 && col%2 != 0 {
 				size := (col - 13) / 2
@@ -185,6 +191,7 @@ func (db *Database) ReadPayload(reader *bytes.Reader) []any {
 			}
 		}
 	}
+	return colData
 }
 
 func (db *Database) HandleSelectStatement(stmt *Select) {
@@ -200,17 +207,84 @@ func (db *Database) HandleSelectStatement(stmt *Select) {
 
 	var countTable bool
 	for _, expr := range stmt.SelectExpr {
-		if strings.Contains("COUNT(*)", expr) {
+		if strings.Contains("count(*)", expr) {
 			countTable = true
 			break
 		}
 	}
 	reader := bytes.NewReader(pageContent)
 	PageHeader, _ := readHeader(reader)
+	records := make(map[string]int, 0)
+	for i, col := range colTables {
+		records[col] = i
+	}
 	if countTable {
 		fmt.Println(PageHeader.numberOfCells)
 	} else {
+		cellPointerArray := make([]uint16, 0)
+		var cellPointer uint16
+		for i := 0; i < int(PageHeader.numberOfCells); i++ {
+			binary.Read(reader, binary.BigEndian, &cellPointer)
+			cellPointerArray = append(cellPointerArray, cellPointer)
+		}
+		for i := 0; i < int(PageHeader.numberOfCells); i++ {
+			binary.Read(reader, binary.BigEndian, &cellPointer)
+			cellPointerArray = append(cellPointerArray, cellPointer)
+		}
+		filterCell := make([]Cell, 0)
+		for _, cellPointer := range cellPointerArray {
+			reader.Seek(int64(cellPointer), io.SeekStart)
+			_, _ = readVarint(reader)
+			_, _ = readVarint(reader)
+			totalHeaderSize, offset := readVarint(reader)
+			colTypes := make([]uint64, 0)
+			for offset < int(totalHeaderSize) {
+				columnType, m := readVarint(reader)
+				colTypes = append(colTypes, columnType)
+				offset += m
+			}
+			data := db.ReadPayload(reader, colTypes)
 
+			if len(data) > 0 {
+				// only applies to 1 condition comparision
+				if len(stmt.Where) > 0 {
+					col := stmt.Where[0]
+					val := stmt.Where[2]
+					if idx, ok := records[col]; ok {
+						r := data[idx]
+						if strings.EqualFold(strings.ToLower(fmt.Sprintf("%s", r)), strings.ToLower(val)) {
+							filterCell = append(filterCell, Cell{
+								LeftChildPage: 0,
+								Value:         "",
+								RowId:         1,
+								Payload:       data,
+							})
+						}
+					}
+				} else {
+					filterCell = append(filterCell, Cell{
+						LeftChildPage: 0,
+						Value:         "",
+						RowId:         1,
+						Payload:       data,
+					})
+				}
+			}
+
+		}
+		results := make([][]string, len(filterCell))
+		for _, expr := range stmt.SelectExpr {
+			if idx, ok := records[expr]; ok {
+				for i, cell := range filterCell {
+					t := cell.Payload[idx]
+					results[i] = append(results[i], fmt.Sprintf("%s", t))
+				}
+			}
+		}
+
+		for _, res := range results {
+			fmt.Println(strings.Join(res, "|"))
+		}
 	}
 
 }
